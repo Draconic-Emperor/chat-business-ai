@@ -1,6 +1,8 @@
 import '@vly-ai/integrations';
 import { Toaster } from "@/components/ui/sonner";
 import { RequireAuth } from "@/components/RequireAuth";
+import { BusinessGuard } from "@/components/BusinessGuard";
+import { AppShell } from "@/components/AppShell";
 import { VlyToolbar } from "../vly-toolbar-readonly.tsx";
 import { ConvexAuthProvider } from "@convex-dev/auth/react";
 import { ConvexReactClient } from "convex/react";
@@ -12,7 +14,14 @@ import "./index.css";
 // Lazy load route components for better code splitting
 const Landing = lazy(() => import("./pages/Landing.tsx"));
 const AuthPage = lazy(() => import("./pages/Auth.tsx"));
+const Onboarding = lazy(() => import("./pages/Onboarding.tsx"));
 const Dashboard = lazy(() => import("./pages/Dashboard.tsx"));
+const ChatPage = lazy(() => import("./pages/Chat.tsx"));
+const InventoryPage = lazy(() => import("./pages/Inventory.tsx"));
+const CustomersPage = lazy(() => import("./pages/Customers.tsx"));
+const AnalyticsPage = lazy(() => import("./pages/Analytics.tsx"));
+const ReportsPage = lazy(() => import("./pages/Reports.tsx"));
+const SettingsPage = lazy(() => import("./pages/Settings.tsx"));
 const NotFound = lazy(() => import("./pages/NotFound.tsx"));
 
 // Simple loading fallback for route transitions
@@ -25,8 +34,7 @@ function RouteLoading() {
 }
 
 /** Silent error boundary — if VlyToolbar crashes it renders nothing instead of
- *  crashing the whole app (e.g. hook errors in the browser runtime). */
-class ToolbarErrorBoundary extends React.Component<
+ *  crashing the whole app (e.g. hook errors in the browser runtime). */class ToolbarErrorBoundary extends React.Component<
   { children: React.ReactNode },
   { hasError: boolean }
 > {
@@ -124,14 +132,18 @@ createRoot(document.getElementById("root")!).render(
                 path="/auth"
                 element={<AuthPage redirectAfterAuth="/dashboard" />}
               />
-              <Route
-                path="/dashboard"
-                element={
-                  <RequireAuth>
-                    <Dashboard />
-                  </RequireAuth>
-                }
-              />
+              <Route path="/onboarding" element={<RequireAuth><Onboarding /></RequireAuth>} />
+              <Route element={<RequireAuth><BusinessGuard /></RequireAuth>}>
+                <Route element={<AppShell />}>
+                  <Route path="/dashboard" element={<Dashboard />} />
+                  <Route path="/chat" element={<ChatPage />} />
+                  <Route path="/inventory" element={<InventoryPage />} />
+                  <Route path="/customers" element={<CustomersPage />} />
+                  <Route path="/analytics" element={<AnalyticsPage />} />
+                  <Route path="/reports" element={<ReportsPage />} />
+                  <Route path="/settings" element={<SettingsPage />} />
+                </Route>
+              </Route>
               <Route path="*" element={<NotFound />} />
             </Routes>
           </Suspense>

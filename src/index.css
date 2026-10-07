@@ -42,40 +42,76 @@
   --color-sidebar-ring: var(--sidebar-ring);
 }
 
-/* CHANGE VALUES FOR THEME */
+/* CHANGE VALUES FOR THEME — Smart Hustle AI: premium dark Kenyan fintech.
+   :root and .dark share the same values so the app is always dark. */
 :root {
-  --radius: 0.625rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.646 0.222 41.116);
-  --chart-2: oklch(0.6 0.118 184.704);
-  --chart-3: oklch(0.398 0.07 227.392);
-  --chart-4: oklch(0.828 0.189 84.429);
-  --chart-5: oklch(0.769 0.188 70.08);
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  --radius: 0.75rem;
+  --background: oklch(0.145 0.015 180);
+  --foreground: oklch(0.97 0.005 160);
+  --card: oklch(0.185 0.018 178);
+  --card-foreground: oklch(0.97 0.005 160);
+  --popover: oklch(0.185 0.018 178);
+  --popover-foreground: oklch(0.97 0.005 160);
+  --primary: oklch(0.72 0.17 162);
+  --primary-foreground: oklch(0.14 0.02 170);
+  --secondary: oklch(0.24 0.02 178);
+  --secondary-foreground: oklch(0.95 0.01 160);
+  --muted: oklch(0.24 0.02 178);
+  --muted-foreground: oklch(0.68 0.015 175);
+  --accent: oklch(0.7 0.13 185);
+  --accent-foreground: oklch(0.14 0.02 178);
+  --destructive: oklch(0.62 0.21 25);
+  --border: oklch(0.28 0.02 178);
+  --input: oklch(0.26 0.02 178);
+  --ring: oklch(0.72 0.17 162);
+  --chart-1: oklch(0.72 0.17 162);
+  --chart-2: oklch(0.7 0.13 185);
+  --chart-3: oklch(0.65 0.15 145);
+  --chart-4: oklch(0.75 0.12 200);
+  --chart-5: oklch(0.8 0.15 120);
+  --sidebar: oklch(0.165 0.018 178);
+  --sidebar-foreground: oklch(0.95 0.01 160);
+  --sidebar-primary: oklch(0.72 0.17 162);
+  --sidebar-primary-foreground: oklch(0.14 0.02 170);
+  --sidebar-accent: oklch(0.24 0.02 178);
+  --sidebar-accent-foreground: oklch(0.95 0.01 160);
+  --sidebar-border: oklch(0.28 0.02 178);
+  --sidebar-ring: oklch(0.72 0.17 162);
+}
+
+.dark {
+  --radius: 0.75rem;
+  --background: oklch(0.145 0.015 180);
+  --foreground: oklch(0.97 0.005 160);
+  --card: oklch(0.185 0.018 178);
+  --card-foreground: oklch(0.97 0.005 160);
+  --popover: oklch(0.185 0.018 178);
+  --popover-foreground: oklch(0.97 0.005 160);
+  --primary: oklch(0.72 0.17 162);
+  --primary-foreground: oklch(0.14 0.02 170);
+  --secondary: oklch(0.24 0.02 178);
+  --secondary-foreground: oklch(0.95 0.01 160);
+  --muted: oklch(0.24 0.02 178);
+  --muted-foreground: oklch(0.68 0.015 175);
+  --accent: oklch(0.7 0.13 185);
+  --accent-foreground: oklch(0.14 0.02 178);
+  --destructive: oklch(0.62 0.21 25);
+  --border: oklch(0.28 0.02 178);
+  --input: oklch(0.26 0.02 178);
+  --ring: oklch(0.72 0.17 162);
+  --chart-1: oklch(0.72 0.17 162);
+  --chart-2: oklch(0.7 0.13 185);
+  --chart-3: oklch(0.65 0.15 145);
+  --chart-4: oklch(0.75 0.12 200);
+  --chart-5: oklch(0.8 0.15 120);
+  --sidebar: oklch(0.165 0.018 178);
+  --sidebar-foreground: oklch(0.95 0.01 160);
+  --sidebar-primary: oklch(0.72 0.17 162);
+  --sidebar-primary-foreground: oklch(0.14 0.02 170);
+  --sidebar-accent: oklch(0.24 0.02 178);
+  --sidebar-accent-foreground: oklch(0.95 0.01 160);
+  --sidebar-border: oklch(0.28 0.02 178);
+  --sidebar-ring: oklch(0.72 0.17 162);
 }
 
 .dark {
@@ -122,5 +158,48 @@
   button:not([disabled]),
   [role="button"]:not([disabled]) {
     cursor: pointer;
+  }
+}
+
+@layer utilities {
+  /* Dark glass effect for cards */
+  .glass {
+    background: color-mix(in oklch, var(--card) 72%, transparent);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    border: 1px solid color-mix(in oklch, var(--border) 80%, transparent);
+  }
+  /* Subtle glow used on hero badges and active nav items */
+  .glow-primary {
+    box-shadow:
+      0 0 0 1px color-mix(in oklch, var(--primary) 35%, transparent),
+      0 8px 30px -8px color-mix(in oklch, var(--primary) 45%, transparent);
+  }
+  .glow-text {
+    text-shadow: 0 0 24px color-mix(in oklch, var(--primary) 55%, transparent);
+  }
+  /* Dotted grid backdrop for the landing hero */
+  .grid-backdrop {
+    background-image:
+      radial-gradient(
+        circle at 1px 1px,
+        color-mix(in oklch, var(--primary) 22%, transparent) 1px,
+        transparent 0
+      );
+    background-size: 28px 28px;
+  }
+  /* WhatsApp-style chat bubble tails */
+  .bubble-out {
+    border-radius: 1rem 1rem 0.25rem 1rem;
+  }
+  .bubble-in {
+    border-radius: 1rem 1rem 1rem 0.25rem;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
   }
 }

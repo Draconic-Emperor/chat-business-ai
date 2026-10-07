@@ -67,8 +67,10 @@ const TENS: Record<string, number> = {
   sabini: 70, themanini: 80, tisini: 90,
 };
 
-const HUNDRED_WORDS = new Set(["hundred", "mia"]);
-const THOUSAND_WORDS = new Set(["thousand", "elfu"]);
+const HUNDREDS = new Set(["hundred", "mia"]);
+const THOUSANDS = new Set(["thousand", "elfu"]);
+const HUNDRED_WORDS = HUNDREDS;
+const THOUSAND_WORDS = THOUSANDS;
 const AND_WORDS = new Set(["na", "and"]);
 const NUMBER_WORD = new Set<string>([
   ...Object.keys(SMALL),

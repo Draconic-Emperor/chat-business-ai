@@ -18,6 +18,35 @@ const SUGGESTIONS = [
   "low stock",
 ];
 
+/** Smart follow-up suggestions shown under the latest assistant reply. */
+function suggestionsFor(reply: string): string[] {
+  if (/Debt recorded|owes/i.test(reply)) {
+    return ["show debts", "customer balances", "top customers"];
+  }
+  if (/Payment received|balance has been reduced/i.test(reply)) {
+    return ["customer balances", "show debts", "sales today"];
+  }
+  if (/Sale recorded|Purchase recorded|Expense recorded/i.test(reply)) {
+    return ["show profit", "inventory", "sales today"];
+  }
+  if (/Low stock alert|low-stock/i.test(reply)) {
+    return ["low stock", "inventory value", "profit today"];
+  }
+  if (/Inventory|remaining in inventory/i.test(reply)) {
+    return ["low stock", "inventory value", "sales today"];
+  }
+  if (/Profit:/i.test(reply)) {
+    return ["sales this week", "expenses this month", "generate report"];
+  }
+  if (/customer/i.test(reply)) {
+    return ["top customers", "show debts", "customer balances"];
+  }
+  if (/report/i.test(reply)) {
+    return ["monthly report", "profit this month"];
+  }
+  return ["profit today", "inventory", "show customers"];
+}
+
 export default function Chat() {
   const messages = useQuery(api.chatStore.list, { limit: 100 });
   const send = useAction(api.chat.send);
@@ -85,34 +114,55 @@ export default function Chat() {
             <Spinner className="size-6 text-primary" />
           </div>
         ) : (
-          messages.map((m) => (
-            <div
-              key={m._id}
-              className={m.role === "user" ? "flex justify-end" : "flex justify-start"}
-            >
-              <div
-                className={
-                  m.role === "user"
-                    ? "bubble-in max-w-[85%] rounded-2xl bg-secondary px-4 py-2.5 text-sm text-secondary-foreground sm:max-w-[70%]"
-                    : "bubble-out max-w-[95%] rounded-2xl bg-primary/15 px-4 py-2.5 text-sm text-primary-foreground sm:max-w-[75%]"
-                }
-              >
-                <p className="whitespace-pre-wrap break-words leading-relaxed">{m.content}</p>
-                <p
-                  className={`mt-1 text-right text-[10px] ${
-                    m.role === "user" ? "text-secondary-foreground/60" : "text-primary/70"
-                  }`}
-                >
-                  {formatDateTime(m.createdAt).split(", ")[1] ?? ""}
-                </p>
+          messages.map((m, idx) => {
+            const isUser = m.role === "user";
+            const isLast = idx === messages.length - 1;
+            const chips = !isUser && isLast && !sending ? suggestionsFor(m.content) : [];
+            return (
+              <div key={m._id}>
+                <div className={isUser ? "flex justify-end" : "flex justify-start"}>
+                  <div
+                    className={
+                      isUser
+                        ? "bubble-in max-w-[85%] rounded-2xl border border-[#34D399] bg-primary px-4 py-2.5 text-sm text-primary-foreground shadow-sm sm:max-w-[70%]"
+                        : "bubble-out max-w-[95%] rounded-2xl border border-border bg-card px-4 py-2.5 text-sm text-card-foreground shadow-sm sm:max-w-[75%]"
+                    }
+                  >
+                    <p className="whitespace-pre-wrap break-words leading-relaxed">{m.content}</p>
+                    <p
+                      className={`mt-1 text-right text-[10px] ${
+                        isUser ? "text-white/70" : "text-muted-foreground"
+                      }`}
+                    >
+                      {formatDateTime(m.createdAt).split(", ")[1] ?? ""}
+                    </p>
+                  </div>
+                </div>
+                {chips.length > 0 && (
+                  <div className="mt-2 flex flex-wrap gap-1.5 pl-1">
+                    {chips.map((s) => (
+                      <button
+                        key={s}
+                        type="button"
+                        onClick={() => {
+                          setText(s);
+                          inputRef.current?.focus();
+                        }}
+                        className="rounded-full border border-primary/40 bg-primary/10 px-3 py-1 text-[11px] text-primary transition-colors hover:border-primary hover:bg-primary/20"
+                      >
+                        {s}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
-            </div>
-          ))
+            );
+          })
         )}
 
         {sending && (
           <div className="flex justify-start">
-            <div className="bubble-out rounded-2xl bg-primary/15 px-4 py-3">
+            <div className="bubble-out rounded-2xl border border-border bg-card px-4 py-3">
               <Spinner className="size-4 text-primary" />
             </div>
           </div>
@@ -153,7 +203,7 @@ export default function Chat() {
             }
           }}
           placeholder="Type to record or ask… e.g. “Nimeuza 2 shirts kwa 800”"
-          className="max-h-32 min-h-[44px] w-full flex-1 resize-none rounded-2xl border border-border bg-background px-4 py-2.5 text-sm outline-none placeholder:text-muted-foreground/60 focus:border-primary/50"
+          className="max-h-32 min-h-[44px] w-full flex-1 resize-none rounded-2xl border border-input bg-card px-4 py-2.5 text-sm text-foreground outline-none placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-primary/25"
         />
         <Button
           type="submit"

@@ -80,10 +80,10 @@ export function AppShell() {
               key={to}
               to={to}
               className={({ isActive }) =>
-                `flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors ${
+                `flex items-center gap-3 rounded-r-lg border-l-4 px-3 py-2 text-sm transition-colors ${
                   isActive
-                    ? "bg-sidebar-accent font-medium text-sidebar-accent-foreground"
-                    : "text-sidebar-foreground/80 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground"
+                    ? "border-[#10B981] bg-[#064E3B] font-medium text-white"
+                    : "border-transparent text-sidebar-foreground hover:bg-[#1E293B] hover:text-white"
                 }`
               }
             >
@@ -146,10 +146,10 @@ export function AppShell() {
                   to={to}
                   onClick={() => setMobileOpen(false)}
                   className={({ isActive }) =>
-                    `flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm ${
+                    `flex items-center gap-3 rounded-r-lg border-l-4 px-3 py-2.5 text-sm ${
                       isActive
-                        ? "bg-sidebar-accent font-medium"
-                        : "text-sidebar-foreground/80 hover:bg-sidebar-accent/60"
+                        ? "border-[#10B981] bg-[#064E3B] font-medium text-white"
+                        : "border-transparent text-sidebar-foreground hover:bg-[#1E293B] hover:text-white"
                     }`
                   }
                 >

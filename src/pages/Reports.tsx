@@ -167,7 +167,7 @@ export default function Reports() {
               No transactions yet — record them through the assistant.
             </p>
           ) : (
-            <Table>
+            <Table className="table-fintech">
               <TableHeader>
                 <TableRow className="border-border/60 hover:bg-transparent">
                   <TableHead className="pl-6">Date</TableHead>

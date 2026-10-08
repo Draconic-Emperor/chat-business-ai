@@ -4,8 +4,8 @@ import { v } from "convex/values";
 import { action } from "./_generated/server";
 import { api, internal } from "./_generated/api";
 import { getAuthUserId } from "@convex-dev/auth/server";
-import { parseMessage } from "./lib/parser";
-import { formatKES, productKey } from "./lib/reply";
+import { parseInput } from "./lib/parser";
+import { formatKES, nameKey, productKey } from "./lib/reply";
 import {
   dayLabel,
   rangeWindow,
@@ -63,7 +63,8 @@ function helpReply(): string {
     "",
     "Ask:",
     "• sales / profit / expenses (today, this week, this month)",
-    "• inventory · low stock · customers · top customers",
+    "• inventory · how many shirts left · low stock",
+    "• customers · top customers · john balance · john history",
     "• generate report · summary · help",
   ].join("\n");
 }
@@ -85,19 +86,63 @@ export const send = action({
       content: text,
     });
 
-    const parsed = parseMessage(text);
     let reply: string;
-
-    if (parsed.kind === "transaction") {
-      reply = await handleTransaction(ctx, business._id, parsed.tx, now);
-    } else if (parsed.kind === "command") {
-      reply = await handleCommand(ctx, business._id, parsed.command, parsed.range, now);
-    } else {
-      const ai = await askAI(
-        "You are Smart Hustle AI, a business assistant for Kenyan small traders (kiosks, shops, salons, market sellers). They chat in English, Swahili or Sheng. Reply briefly and warmly (max 3 short lines). If they seem to be recording a sale, expense or purchase, show them an example of how to phrase it.",
-        text,
-      );
-      reply = ai ?? unknownReply();
+    try {
+      // Multi-command input: each line / "then" clause is handled separately.
+      const parts = parseInput(text);
+      if (parts.length > 1) {
+        const replies: string[] = [];
+        for (const p of parts) {
+          if (p.result.kind === "transaction") {
+            replies.push(
+              await handleTransaction(ctx, business._id, p.result.tx, now),
+            );
+          } else if (p.result.kind === "command") {
+            replies.push(
+              await handleCommand(
+                ctx,
+                business._id,
+                p.result.command,
+                p.result.range,
+                now,
+                p.result.name,
+              ),
+            );
+          } else {
+            replies.push(
+              `❓ I couldn't understand "${p.text}". Type "help" for examples.`,
+            );
+          }
+        }
+        reply = replies.join("\n\n");
+      } else {
+        const parsed = parts[0].result;
+        if (parsed.kind === "transaction") {
+          reply = await handleTransaction(ctx, business._id, parsed.tx, now);
+        } else if (parsed.kind === "command") {
+          reply = await handleCommand(
+            ctx,
+            business._id,
+            parsed.command,
+            parsed.range,
+            now,
+            parsed.name,
+          );
+        } else {
+          const ai = await askAI(
+            "You are Smart Hustle AI, a business assistant for Kenyan small traders (kiosks, shops, salons, market sellers). They chat in English, Swahili or Sheng. Reply briefly and warmly (max 3 short lines). If they seem to be recording a sale, expense or purchase, show them an example of how to phrase it.",
+            text,
+          );
+          reply = ai ?? unknownReply();
+        }
+      }
+    } catch (err) {
+      // Never leak raw runtime output ([object Promise], stack traces, ...)
+      // into the chat — always reply with a friendly, human message.
+      reply =
+        err instanceof Error && err.message
+          ? `⚠️ I couldn't complete that: ${err.message}. Nothing was recorded — please try again.`
+          : "⚠️ Something went wrong while processing that. Nothing was recorded — please try again.";
     }
 
     await ctx.runMutation(internal.chatStore.insertMessage, {
@@ -122,6 +167,9 @@ async function handleTransaction(
   const { type } = tx;
 
   if (tx.missingAmount) {
+    if (type === "debt") {
+      return `I understood that ${tx.customerName} owes you, but I couldn't find the amount. Try again like \"${tx.customerName} owes me 500\".`;
+    }
     const what =
       type === "sale"
         ? `the sale of ${tx.quantity ?? 1} ${tx.productName}`
@@ -143,13 +191,17 @@ async function handleTransaction(
   const qty = tx.quantity ?? 1;
   const who = tx.customerName ? ` for ${tx.customerName}` : "";
   switch (type) {
-    case "sale":
+    case "sale": {
+      // IMPORTANT: stockNote is async — it MUST be awaited, otherwise the
+      // Promise object gets stringified into the chat as "[object Promise]".
+      const note = await stockNote(ctx, businessId, tx.productName);
       return [
         `✅ Sale recorded${who}: ${qty} × ${tx.productName} — ${formatKES(tx.amount)}`,
-        stockNote(ctx, businessId, tx.productName),
+        note,
       ]
         .filter(Boolean)
         .join("\n");
+    }
     case "purchase":
       return `📦 Purchase recorded: ${qty} × ${tx.productName} for ${formatKES(tx.amount)} — stock updated.`;
     case "expense":
@@ -176,9 +228,11 @@ async function stockNote(
       productKey(i.productName) === key,
   );
   if (!item) return "";
-  if (item.quantity <= 0) return `⚠️ ${item.productName} is now out of stock.`;
+  if (item.quantity <= 0) {
+    return `⚠️ Low stock alert:\n${item.productName} remaining: 0 — out of stock.`;
+  }
   if (item.quantity <= item.lowStockThreshold) {
-    return `⚠️ ${item.productName} is running low: ${item.quantity} left.`;
+    return `⚠️ Low stock alert:\n${item.productName} remaining: ${item.quantity}.`;
   }
   return `Stock left: ${item.quantity}.`;
 }
@@ -193,6 +247,7 @@ async function handleCommand(
   command: string,
   range: Range,
   now: number,
+  name?: string,
 ): Promise<string> {
   const { from, label } = rangeWindow(range, now);
 
@@ -258,6 +313,94 @@ async function handleCommand(
       `Purchases: ${formatKES(purchases)}`,
       `*Profit: ${formatKES(profit)}*`,
     ].join("\n");
+  }
+
+  // --- inventory question engine ---
+  // "how many shirts left?" · "shirts remaining?" · "stock imebaki ngapi"
+  if (command === "inventory_query") {
+    if (!name) {
+      // General question ("show inventory" / "onyesha stock") -> full listing.
+      return handleCommand(ctx, businessId, "inventory", "all", now);
+    }
+    const items: any[] = await ctx.runQuery(api.inventory.list, {});
+    const key = productKey(name);
+    const item = items.find(
+      (i: any) =>
+        productKey(i.productName) === key ||
+        i.productName.toLowerCase().includes(name.toLowerCase()),
+    );
+    if (!item) {
+      if (items.length === 0) {
+        return `Your inventory is empty. Record stock by typing "bought 10 ${name} at 500".`;
+      }
+      return `I couldn't find "${name}" in your inventory. You have: ${items
+        .slice(0, 8)
+        .map((i: any) => i.productName)
+        .join(", ")}.`;
+    }
+    if (item.quantity <= 0) {
+      return `⚠️ Low stock alert:\n${item.productName} remaining: 0 — out of stock.`;
+    }
+    if (item.quantity <= item.lowStockThreshold) {
+      return `⚠️ Low stock alert:\n${item.productName} remaining: ${item.quantity}.`;
+    }
+    return `You have ${item.quantity} ${item.productName} remaining in inventory.`;
+  }
+
+  // --- per-customer balance ---
+  // "john balance" · "balance ya john" · "mary deni"
+  if (command === "customer_balance" && name) {
+    const customers: any[] = await ctx.runQuery(api.customers.list, {});
+    const customer = customers.find(
+      (c: any) => nameKey(c.name) === nameKey(name),
+    );
+    if (!customer) {
+      return `I don't have a customer called "${name}" yet. They're created automatically when you record a sale or debt with their name, e.g. "${name} owes me 500".`;
+    }
+    const spentNote =
+      customer.totalSpent > 0
+        ? `\nLifetime purchases: ${formatKES(customer.totalSpent)}.`
+        : "";
+    if (customer.balance > 0) {
+      return `💰 ${customer.name} owes you ${formatKES(customer.balance)}.${spentNote}`;
+    }
+    return `✅ ${customer.name} has no outstanding balance. 🎉${spentNote}`;
+  }
+
+  // --- per-customer history ---
+  // "john history" · "show john transactions" · "history of mary"
+  if (command === "customer_history" && name) {
+    const rows: any[] = await ctx.runQuery(api.transactions.recent, {
+      limit: 300,
+    });
+    const theirs = rows.filter(
+      (r: any) =>
+        r.customerName && nameKey(r.customerName) === nameKey(name),
+    );
+    if (theirs.length === 0) {
+      return `No recorded transactions for "${name}" yet. Record one with "sold 2 shirts to ${name} for 1000".`;
+    }
+    const totalSpent = theirs
+      .filter((r: any) => r.type === "sale")
+      .reduce((s: number, r: any) => s + r.amount, 0);
+    const icons: Record<string, string> = {
+      sale: "💵",
+      debt: "📝",
+      payment_received: "💰",
+      expense: "🧾",
+      purchase: "📦",
+    };
+    const lines = theirs.slice(0, 10).map((r: any) => {
+      const kind = String(r.type).replace("_", " ");
+      return `${icons[r.type] ?? "•"} ${dayLabel(r.createdAt)}: ${kind} — ${formatKES(r.amount)}`;
+    });
+    return [
+      `📋 ${name} — ${theirs.length} record${theirs.length === 1 ? "" : "s"}, total spent ${formatKES(totalSpent)}:`,
+      ...lines,
+      theirs.length > 10 ? `\n…and ${theirs.length - 10} more (see Customers page).` : "",
+    ]
+      .filter((l) => l !== "")
+      .join("\n");
   }
 
   if (command === "inventory" || command === "low_stock") {

@@ -177,9 +177,9 @@ export default function Inventory() {
         </Card>
       ) : (
         <div className="overflow-hidden rounded-xl border border-border/60 bg-card/50">
-          <table className="w-full text-sm">
+          <table className="table-fintech w-full text-sm">
             <thead>
-              <tr className="border-b border-border/60 text-left text-xs text-muted-foreground">
+              <tr className="border-b border-border/60 text-left text-xs text-slate-300">
                 <th className="px-4 py-3 font-medium">Item</th>
                 <th className="px-4 py-3 font-medium">Stock</th>
                 <th className="hidden px-4 py-3 font-medium sm:table-cell">Sell price</th>
@@ -191,7 +191,7 @@ export default function Inventory() {
               {filtered.map((item) => (
                 <tr
                   key={item._id}
-                  className="border-b border-border/40 last:border-0 hover:bg-muted/40"
+                  className="border-b border-border/40 text-slate-200 last:border-0"
                 >
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2">

@@ -75,7 +75,7 @@ export default function Analytics() {
             <Card className="border-border/70 bg-card/60">
               <CardContent className="p-5">
                 <p className="text-xs text-muted-foreground">This month sales</p>
-                <p className="mt-1 text-xl font-bold text-emerald-400">
+                <p className="mt-1 text-xl font-bold text-primary">
                   {formatKES(month.sales)}
                 </p>
               </CardContent>
@@ -140,10 +140,10 @@ export default function Analytics() {
                     content={<ChartTooltip />}
                     cursor={{ fill: "var(--primary)", opacity: 0.08 }}
                   />
-                  <Bar dataKey="sales" name="Sales" fill="#34d399" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="expenses" name="Expenses" fill="#f87171" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="purchases" name="Purchases" fill="#38bdf8" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="profit" name="Profit" fill="#2dd4bf" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="sales" name="Sales" fill="#10B981" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="expenses" name="Expenses" fill="#EF4444" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="purchases" name="Purchases" fill="#F59E0B" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="profit" name="Profit" fill="#0EA5E9" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -188,15 +188,15 @@ export default function Analytics() {
                     type="monotone"
                     dataKey="profit"
                     name="Profit"
-                    stroke="#2dd4bf"
+                    stroke="#0EA5E9"
                     strokeWidth={2.5}
-                    dot={{ r: 3, fill: "#2dd4bf" }}
+                    dot={{ r: 3, fill: "#0EA5E9" }}
                   />
                   <Line
                     type="monotone"
                     dataKey="sales"
                     name="Sales"
-                    stroke="#34d399"
+                    stroke="#10B981"
                     strokeWidth={2}
                     dot={false}
                     opacity={0.7}

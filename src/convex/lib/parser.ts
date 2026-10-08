@@ -38,11 +38,14 @@ export type ChatCommand =
   | "top_customers"
   | "report"
   | "help"
-  | "summary";
+  | "summary"
+  | "inventory_query"
+  | "customer_balance"
+  | "customer_history";
 
 export type ParseResult =
   | { kind: "transaction"; tx: ExtractedTx }
-  | { kind: "command"; command: ChatCommand; range: Range }
+  | { kind: "command"; command: ChatCommand; range: Range; name?: string }
   | { kind: "unknown" };
 
 import type { Range } from "./time";
@@ -58,6 +61,11 @@ const SMALL: Record<string, number> = {
   fifteen: 15, sixteen: 16, seventeen: 17, eighteen: 18, nineteen: 19,
   moja: 1, mbili: 2, tatu: 3, nne: 4, tano: 5, sita: 6, saba: 7, nane: 8,
   tisa: 9, kumi: 10,
+  // Swahili noun-class prefixed forms: "mashati matatu" = 3 shirts,
+  // "muda miwili" = 2, "vipodozi vitatu" = 3, etc.
+  mawili: 2, matatu: 3, manne: 4, matano: 5,
+  miwili: 2, mitatu: 3, minne: 4, mitano: 5,
+  viwili: 2, vitatu: 3, vinne: 4, vitano: 5,
 };
 
 const TENS: Record<string, number> = {
@@ -210,11 +218,12 @@ const EXPENSE_VERBS = new Set([
 
 const PAYMENT_VERBS = new Set([
   "alipa", "amelipa", "amenilipa", "alinilipa", "walipa", "wamelipa",
+  "alinipa", "amenipa", "anipa",
 ]);
 
 const DEBT_VERBS = new Set([
   "owes", "owe", "owed", "deni", "madeni", "mkopo", "mikopo", "credit",
-  "credits", "anadai",
+  "credits", "anadai", "ananidai", "anadaiwa", "ananidaiwa",
 ]);
 
 const FILLER_WORDS = new Set([
@@ -231,6 +240,8 @@ const STOP_WORDS = new Set([
   "ni", "its", "it", "with", "and", "na", "also", "please",
   "tafadhali", "customer", "mteja", "client", "from", "of", "that",
   "this", "hii", "record", "records", "recorded", "add", "added",
+  // Question words — "who owes me money" is a query, not a debt from "Who"
+  "who", "whom", "whose", "nani", "where", "when",
 ]);
 
 const CUSTOMER_LABELS = new Set(["customer", "mteja", "client"]);
@@ -245,6 +256,14 @@ const DEBT_OF_RE =
 
 // "john ana deni 500", "jane anadai 300"
 const ANA_DENI_RE = /\b([a-z][a-z0-9]*)\s+ana\s?deni\b/;
+
+// "received 500 from john", "nimepokea 500 kutoka kwa john"
+const RECEIVED_FROM_RE =
+  /\b(?:received|nimepokea|pokea)\s+(?:kes\s*|ksh\s*)?(\d+(?:\.\d+)?)\s+(?:from|kutoka)\s+(?:kwa\s+)?([a-z][a-z0-9]*(?:\s[a-z][a-z0-9]*){0,2})/;
+
+// "john took goods on credit worth 1000"
+const CREDIT_TAKE_RE =
+  /\b([a-z][a-z0-9]{1,15})\s+took\s+(?:goods\s+|bidhaa\s+)?(?:on\s+)?credit\b(?:\s+(?:worth\s+|ya\s+)?(?:kes\s*|ksh\s*)?(\d+(?:\.\d+)?))?/;
 
 // ---------------------------------------------------------------------------
 // Transaction parsing
@@ -292,6 +311,15 @@ function nameFromTokens(tokens: string[]): string | null {
   return parts.length > 0 ? parts.join(" ") : null;
 }
 
+/** "john doe" -> "John Doe" for nicer stored/displayed names. */
+function titleCase(s: string): string {
+  return s
+    .trim()
+    .split(/\s+/)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(" ");
+}
+
 /** Try to read the message as one business transaction. Null if it isn't one. */
 function tryParseTransaction(normalized: string): ExtractedTx | null {
   const tokens = normalized.split(" ").filter(Boolean);
@@ -304,6 +332,25 @@ function tryParseTransaction(normalized: string): ExtractedTx | null {
   const debtOf = DEBT_OF_RE.exec(normalized);
   const anaDeni = ANA_DENI_RE.exec(normalized);
 
+  // --- explicit payment / credit patterns (win over generic verb logic) ---
+  const receivedFrom = RECEIVED_FROM_RE.exec(normalized);
+  if (receivedFrom) {
+    return {
+      type: "payment_received",
+      amount: Number(receivedFrom[1]),
+      customerName: titleCase(receivedFrom[2]),
+    };
+  }
+  const creditTake = CREDIT_TAKE_RE.exec(normalized);
+  if (creditTake) {
+    return {
+      type: "debt",
+      amount: creditTake[2] ? Number(creditTake[2]) : 0,
+      missingAmount: creditTake[2] ? undefined : true,
+      customerName: titleCase(creditTake[1]),
+    };
+  }
+
   if (!verb && !debtOf && !anaDeni) return null;
 
   // --- customer name (words before the verb, or from debt patterns) ---
@@ -314,7 +361,7 @@ function tryParseTransaction(normalized: string): ExtractedTx | null {
   }
   if (!customerName && debtOf) customerName = debtOf[1]?.trim();
   if (!customerName && anaDeni) customerName = anaDeni[1];
-  if (customerName) customerName = customerName.trim();
+  if (customerName) customerName = titleCase(customerName.trim());
 
   // --- pick a type ---
   let type: TxType;
@@ -415,7 +462,12 @@ function tryParseTransaction(normalized: string): ExtractedTx | null {
   // --- validation per type ---
   if (type === "debt" || type === "payment_received") {
     if (!customerName) return null;
-    if (missingAmount) return null;
+    if (missingAmount) {
+      // Only debt may proceed with a missing amount (assistant asks for it).
+      return type === "debt"
+        ? { type, amount: 0, missingAmount: true, customerName }
+        : null;
+    }
     return { type, amount, customerName, productName };
   }
   if (!productName) return null;
@@ -454,7 +506,7 @@ const COMMAND_PATTERNS: CmdPattern[] = [
   },
   {
     command: "customers",
-    re: /\b(customers?|wateja|debts?|madeni|balance|balansi|deni)\b/,
+    re: /\b(customers?|wateja|debts?|madeni|balance|balansi|deni|who\s+owes|owes\s+me|nani\s+ananidai)\b/,
   },
   { command: "inventory", re: /\b(inventory|stock|stocks|bidhaa)\b/ },
   { command: "profit", re: /\b(profit|faida|margin|gain)\b/ },
@@ -468,15 +520,111 @@ const COMMAND_PATTERNS: CmdPattern[] = [
 
 function detectRange(text: string): Range {
   if (/\b(today|leo)\b/.test(text)) return "today";
-  if (/\b(this week|last week|week|wiki|juma|7 days)\b/.test(text)) return "week";
-  if (/\b(this month|last month|month|mwezi|30 days)\b/.test(text)) return "month";
+  if (/\b(this week|last week|week|weekly|wiki|juma|7 days)\b/.test(text)) return "week";
+  if (/\b(this month|last month|month|monthly|mwezi|30 days)\b/.test(text)) return "month";
   if (/\b(all time|all|yote|ever|so far|kuanzia)\b/.test(text)) return "all";
   return "today";
 }
 
+// ---------------------------------------------------------------------------
+// Inventory question engine: "how many shirts left", "stock imebaki ngapi",
+// "shirts remaining?", "stock of shirts", ...
+// ---------------------------------------------------------------------------
+
+const INV_Q_RE =
+  /\b(?:how many|how much|ngapi|mangapi|kiasi gani|remaining|left|imebaki|zimebaki|nimebaki|baki|stock of|stock levels?|levels? ya|onyesha stock|do i have|niko na|iko na)\b/;
+
+const INV_Q_STOP = new Set([
+  "how", "many", "much", "left", "remaining", "remain", "remains", "stock",
+  "stocks", "of", "show", "do", "i", "we", "have", "has", "is", "are",
+  "there", "what", "about", "check", "level", "levels", "inventory",
+  "balance", "ngapi", "mangapi", "kiasi", "gani", "imebaki", "zimebaki",
+  "nimebaki", "baki", "onyesha", "na", "the", "a", "an", "for", "still",
+  "yet", "quantity", "qty", "in", "it", "my", "me", "please", "tafadhali",
+  "bidhaa", "products", "product", "item", "items", "all", "value",
+]);
+
+/**
+ * Detect an inventory question and extract the product being asked about.
+ * Returns null when the message isn't an inventory question, undefined when
+ * it is a general one ("show inventory" / "onyesha stock"), or the product
+ * name ("shirts").
+ */
+function detectInventoryQuery(normalized: string): string | undefined | null {
+  if (!INV_Q_RE.test(normalized)) return null;
+  const tokens = normalized.split(" ").filter(Boolean);
+  const product = tokens
+    .filter((t) => !INV_Q_STOP.has(t) && !/^\d+(?:\.\d+)?$/.test(t))
+    .slice(0, 3)
+    .join(" ")
+    .trim();
+  return product.length > 0 ? product : undefined;
+}
+
+// ---------------------------------------------------------------------------
+// Per-customer queries: "john balance", "balance ya john", "mary history",
+// "show john transactions"
+// ---------------------------------------------------------------------------
+
+const GENERIC_NAME_WORDS = new Set([
+  "customer", "customers", "wateja", "stock", "debt", "debts", "madeni",
+  "balance", "balances", "report", "sales", "profit", "expenses",
+  "inventory", "summary", "help", "show", "check", "my", "who", "what",
+  "mimi", "i", "we", "the", "low", "top", "all", "today", "week", "month",
+]);
+
+function extractCustomerQuery(
+  normalized: string,
+): { command: "customer_balance" | "customer_history"; name: string } | null {
+  const balance =
+    /\b(?:balance|balansi|saldo|deni)\s+(?:ya|wa|of|for|la)\s+([a-z][a-z0-9]{1,15})\b/.exec(
+      normalized,
+    ) ??
+    /\b([a-z][a-z0-9]{1,15})\s+(?:balance|balansi|saldo)\b/.exec(normalized);
+  if (balance && !GENERIC_NAME_WORDS.has(balance[1])) {
+    return { command: "customer_balance", name: balance[1] };
+  }
+  const history =
+    /\b(?:history|historia|transactions?|statement)\s+(?:of|for|ya|wa)\s+([a-z][a-z0-9]{1,15})\b/.exec(
+      normalized,
+    ) ??
+    /\b([a-z][a-z0-9]{1,15})\s+(?:history|historia|transactions?)\b/.exec(
+      normalized,
+    ) ??
+    /\b(?:show|onyesha)\s+([a-z][a-z0-9]{1,15})\s+transactions?\b/.exec(
+      normalized,
+    );
+  if (history && !GENERIC_NAME_WORDS.has(history[1])) {
+    return { command: "customer_history", name: history[1] };
+  }
+  return null;
+}
+
 function matchCommand(
   normalized: string,
-): { kind: "command"; command: ChatCommand; range: Range } | null {
+): { kind: "command"; command: ChatCommand; range: Range; name?: string } | null {
+  // Inventory questions win over the generic inventory command so that
+  // "how many shirts left" is not treated as a full stock listing.
+  const invProduct = detectInventoryQuery(normalized);
+  if (invProduct !== null) {
+    return {
+      kind: "command",
+      command: "inventory_query",
+      range: "all",
+      name: invProduct,
+    };
+  }
+
+  const customerQuery = extractCustomerQuery(normalized);
+  if (customerQuery) {
+    return {
+      kind: "command",
+      command: customerQuery.command,
+      range: "all",
+      name: titleCase(customerQuery.name),
+    };
+  }
+
   for (const p of COMMAND_PATTERNS) {
     if (p.re.test(normalized)) {
       let range = detectRange(normalized);
@@ -489,7 +637,9 @@ function matchCommand(
       if (stateful && !/\b(today|leo)\b/.test(normalized)) range = "all";
       if (
         p.command === "report" &&
-        !/\b(today|week|wiki|mwezi|month|all|yote)\b/.test(normalized)
+        !/\b(today|leo|week|weekly|wiki|juma|month|monthly|mwezi|all|yote)\b/.test(
+          normalized,
+        )
       ) {
         range = "month";
       }
@@ -512,4 +662,32 @@ export function parseMessage(raw: string): ParseResult {
   const cmd = matchCommand(normalized);
   if (cmd) return cmd;
   return { kind: "unknown" };
+}
+
+// ---------------------------------------------------------------------------
+// Multi-command input: split one message into several independent commands,
+// e.g. "Bought stock KES 5000\nPaid transport KES 500\nSold shirts KES 2000".
+// ---------------------------------------------------------------------------
+
+const SEGMENT_SPLIT_RE = /\n+|;+|\s+(?:and then|then|kisha|halafu)\s+/i;
+
+/**
+ * Parse a raw message, splitting it on newlines / semicolons / "then" when
+ * that yields at least two recognizable commands. Falls back to parsing the
+ * whole message as one when the split doesn't clearly help, so existing
+ * single-command behaviour is preserved.
+ */
+export function parseInput(
+  raw: string,
+): { text: string; result: ParseResult }[] {
+  const segments = raw
+    .split(SEGMENT_SPLIT_RE)
+    .map((s) => s.trim())
+    .filter(Boolean);
+  if (segments.length > 1) {
+    const parts = segments.map((s) => ({ text: s, result: parseMessage(s) }));
+    const meaningful = parts.filter((p) => p.result.kind !== "unknown");
+    if (meaningful.length >= 2) return parts;
+  }
+  return [{ text: raw, result: parseMessage(raw) }];
 }
